@@ -27,7 +27,6 @@ class LearningAgent(Agent):
         ## TO DO ##
         ###########
         # Set any additional class parameters as needed
-        # 参考 https://github.com/diyjac/smartcab.git
         self.t = 0
         random.seed(0)
 
@@ -51,8 +50,11 @@ class LearningAgent(Agent):
             self.epsilon = 0
             self.alpha = 0
         else:
-            self.t += 1.0
-            self.epsilon = math.fabs(math.cos(self.alpha*self.t))
+            # 这个收敛是由慢到快，正确应该由快到慢，乘以系数更佳
+#             self.t += 1
+#             a = 2./math.pi/300
+#             self.epsilon = math.fabs(math.cos(a*self.t))
+            self.epsilon = self.epsilon*0.997
         return None
 
     def build_state(self):
@@ -65,7 +67,7 @@ class LearningAgent(Agent):
         # Collect data about the environment
         waypoint = self.planner.next_waypoint() # The next waypoint 目的地应该行驶的方向，车头方向的相对值
         inputs = self.env.sense(self)           # Visual input - intersection light and traffic
-        # inputs 包含klight交通灯颜色，left左侧车辆目的方向，right右侧车辆目的方向，oncoming交叉方向车辆目的方向，没有车辆则为None
+        # inputs 包含light交通灯颜色，left左侧车辆目的方向，right右侧车辆目的方向，oncoming交叉方向车辆目的方向，没有车辆则为None
         deadline = self.env.get_deadline(self)  # Remaining deadline 在时间之内到达目的地需要的步数
 
         ########### 
@@ -73,16 +75,7 @@ class LearningAgent(Agent):
         ###########
         # Set 'state' as a tuple of relevant data for the agent  
         # 设置 state 为一个tuple类型的相关数据对agent
-        # 参考 https://github.com/diyjac/smartcab.git
-        def tostr(st):
-            if st is None:
-                return 'None'
-            else:
-                return str(st)
-        state = tostr(waypoint) + "_" + inputs['light'] + "_" + tostr(inputs['left']) + "_" +  tostr(inputs['oncoming'])
-        if self.learning:
-            self.Q[state] = self.Q.get(state, {None:0.0, 'forward':0.0, 'left':0.0, 'right':0.0})
-        
+        state = (waypoint, inputs['light'], inputs['left'], inputs['right'], inputs['oncoming'])
         return state
 
 
@@ -98,12 +91,12 @@ class LearningAgent(Agent):
         # Calculate the maximum Q-value of all actions for a given state
         # 计算所有步骤的Q-value最大值对于给定的状态
 
-        maxQ = -1000.0
-        for action in self.Q[state]:
-            if maxQ < self.Q[state][action]:
-                maxQ = self.Q[state][action]
+#         maxQ = -1000.0
+#         for action in self.Q[state]:
+#             if maxQ < self.Q[state][action]:
+#                 maxQ = self.Q[state][action]
 
-        return maxQ 
+        return max(self.Q[state].values()) 
 
 
     def createQ(self, state):
@@ -207,7 +200,7 @@ def run():
     #   verbose     - set to True to display additional output from the simulation
     #   num_dummies - discrete number of dummy agents in the environment, default is 100
     #   grid_size   - discrete number of intersections (columns, rows), default is (8, 6)
-    env = Environment()
+    env = Environment(verbose=True)
     
     ##############
     # Create the driving agent
@@ -215,7 +208,7 @@ def run():
     #   learning   - set to True to force the driving agent to use Q-learning
     #    * epsilon - continuous value for the exploration factor, default is 1
     #    * alpha   - continuous value for the learning rate, default is 0.5
-    agent = env.create_agent(LearningAgent, learning=True, epsilon=1.0, alpha=0.01)
+    agent = env.create_agent(LearningAgent, learning=True, epsilon=1, alpha=0.5)
     
     ##############
     # Follow the driving agent
@@ -230,14 +223,15 @@ def run():
     #   display      - set to False to disable the GUI if PyGame is enabled
     #   log_metrics  - set to True to log trial and simulation results to /logs
     #   optimized    - set to True to change the default log file name
-    sim = Simulator(env, update_delay=0.01, log_metrics=True, optimized=True)
+    sim = Simulator(env, update_delay=0.001, display=False, log_metrics=True, optimized=True)
+#     sim = Simulator(env, update_delay=0.01, display=False, log_metrics=True)
     
     ##############
     # Run the simulator
     # Flags:
     #   tolerance  - epsilon tolerance before beginning testing, default is 0.05 
     #   n_test     - discrete number of testing trials to perform, default is 0
-    sim.run(n_test=100, tolerance=0.001)
+    sim.run(n_test=20, tolerance=0.05)
 
 
 if __name__ == '__main__':
